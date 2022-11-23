@@ -1,61 +1,73 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Subscription } from 'rxjs';
-import { map } from 'rxjs/operators';
+
 import { Post } from './post.model';
+import { PostsService } from './posts.service';
 
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css'],
 })
-export class AppComponent implements OnInit {
-  loadedPosts = [];
+export class AppComponent implements OnInit, OnDestroy {
+  loadedPosts: Post[] = [];
   subscription: Subscription;
+  isFetching = false;
+  error = null;
+  private errorSubscription: Subscription;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private postService: PostsService) {}
 
-  ngOnInit() {}
+  ngOnInit() {
+    this.errorSubscription = this.postService.error.subscribe(
+      (errorMessage) => {
+        this.error = errorMessage;
+      }
+    );
+
+    this.isFetching = true;
+    this.postService.fetchPosts().subscribe(
+      (posts) => {
+        this.isFetching = false;
+        this.loadedPosts = posts;
+      },
+      (error) => {
+        this.isFetching = false;
+        this.error = error.message;
+      }
+    );
+  }
 
   onCreatePost(postData: Post) {
-    // Send Http request (rememnber in angular, this is an observable, need to subscribe to it)
-    // body is automatically converted into json data
-    // requests are only sent when we subscribe to them
-    this.http
-      .post<{ name: string }>(
-        'https://ng-http-requests-5d674-default-rtdb.europe-west1.firebasedatabase.app/posts.json',
-        postData
-      )
-      .subscribe((responseData) => {
-        console.log(responseData);
-      });
+    this.postService.createAndStorePost(postData.title, postData.content);
   }
 
   onClearPosts() {
-    // Send Http request
+    this.postService.deletePosts().subscribe(() => {
+      this.loadedPosts = [];
+    });
   }
 
   onFetchPosts() {
-    // using xjs operators map through pipe to convert an observable into an array
-    this.http
-      // even better way of defining the type of the response, is using <> next to get method (but could also do this in map()); this is the response body type
-      .get<{ [key: string]: Post }>(
-        'https://ng-http-requests-5d674-default-rtdb.europe-west1.firebasedatabase.app/posts.json'
-      )
-      .pipe(
-        map((responseData) => {
-          const postsArray: Post[] = [];
-          for (const key in responseData) {
-            // push the id inside the inner object using spread and {}
-            if (responseData.hasOwnProperty(key)) {
-              postsArray.push({ ...responseData[key], id: key });
-            }
-          }
-          return postsArray;
-        })
-      )
-      .subscribe((posts) => {
-        console.log(posts);
-      });
+    this.isFetching = true;
+    this.postService.fetchPosts().subscribe(
+      (posts) => {
+        this.isFetching = false;
+        this.loadedPosts = posts;
+      },
+      (error) => {
+        this.isFetching = false;
+        this.error = error.message;
+      }
+    );
+  }
+
+  onHandleError() {
+    this.error = null;
+  }
+
+  ngOnDestroy(): void {
+    this.errorSubscription.unsubscribe();
   }
 }
