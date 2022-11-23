@@ -85,7 +85,7 @@ export class PostsService {
       this.http
         .delete(
           'https://ng-http-requests-5d674-default-rtdb.europe-west1.firebasedatabase.app/posts.json',
-          { observe: 'events' }
+          { observe: 'events', responseType: 'json' }
         )
         // we can chain a method here, without disturbing our subscribe subject in the component
         // tap() allow to have very granular control over errors, depending on the response event type (sent...)
